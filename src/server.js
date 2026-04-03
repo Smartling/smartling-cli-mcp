@@ -37,49 +37,70 @@ export function splitArgs(argsString) {
 
 const TOOL_DESCRIPTION = `Run any smartling-cli command. Pass arguments as a single string exactly as you would on the command line.
 
-Available commands:
-
-PROJECTS
-  projects list                          List all projects in the account
-  projects info -p <project-id>          Show project details
-  projects locales -p <project-id>       List target locales
-    --short                              Output locale IDs only
-    --source                             Show source locale only
-    --format '<go-template>'             Custom output format
-
-FILES
-  files list [mask] -p <project-id>      List files in project
-    --short                              URIs only
-  files push <file> -p <project-id>      Upload a file
-    --type <type>                        Override file type (e.g. json, yaml)
-    --branch/-b <prefix>                 Add branch prefix to URI
-  files pull <mask> -p <project-id>      Download translated files
-    --source                             Download source only
-    -l <locale>                          Filter by locale
-  files delete <mask> -p <project-id>    Delete files
-  files rename <old> <new>               Rename a file URI
-  files status -p <project-id>           Show translation progress
-
-MT (Machine Translation)
-  mt detect <file>                       Detect source language of a file
-    --short                              Output locale code only
-    --type <type>                        Override file type
-  mt translate <file> -p <project-id>    Machine translate a file
-    --source-locale <locale>             Source language (auto-detected if omitted)
-    -l <locale>                          Target locale(s)
-    --input-directory <dir>              Source directory
-    --output-directory <dir>             Output directory for translated files
-
-GLOBAL FLAGS (all commands)
+GLOBAL FLAGS (supported by all commands)
   -a, --account <account-id>             Override account ID
   -p, --project <project-id>             Override project ID
 
+PROJECTS
+  projects list                          Display all projects in the account (fields: ID, ACCOUNT, NAME, LOCALE, STATUS)
+  projects info                          Show details about the current project
+  projects locales                       Display all target project locales with descriptions
+    -s, --short                          Show locale IDs only
+    --source                             Display only the source locale
+    --format '<go-template>'             Custom output format, e.g. --format='{{if .Enabled}}{{.LocaleID}}{{end}}\n'
+
+FILES
+  files list ['<mask>']                  List files in project
+    --short                              Show URIs only
+    --format '<go-template>'             Custom output format
+  files push <file> [<uri>]              Upload a file
+    --type <type>                        Override file type detection (e.g. json, plaintext)
+    --directive <directive>              Set file-level directive
+    -b, --branch <prefix>                Add branch prefix to URI; use @auto to detect git branch
+  files pull ['<mask>']                  Download translated files
+    --source                             Download source file only
+    -l <locale>                          Target locale (repeatable: -l es-ES -l fr-FR)
+  files delete ['<mask>']                Delete files (also accepts piped URIs via -)
+  files rename <old-uri> <new-uri>       Rename a file URI in the project
+  files status                           Show translation progress for all files
+
+MT (Machine Translation)
+  mt detect '<mask>'                     Detect source language of files
+    -s, --short                          Output locale code only
+    --type <type>                        Override file type detection
+    --input-directory <dir>              Source directory for input files
+    --output table|json                  Output format
+  mt translate '<mask>'                  Machine translate files to target locale(s)
+    -l, --target-locale <locale>         Target locale (repeatable: -l es-ES -l fr)
+    --source-locale <locale>             Source language (auto-detected if omitted)
+    --input-directory <dir>              Source directory for input files
+    --output-directory <dir>             Destination directory for translated files
+    --type <type>                        Override file type detection
+
 EXAMPLES
-  projects list -a my-account-id
-  files list -p my-project-id
-  files push /my/project/en.json --type json -p my-project-id
-  files pull "**.json" -l es-ES -p my-project-id
-  mt translate /my/project/en.json -l es-ES fr-FR -p my-project-id`;
+  projects list
+  projects locales --short
+  projects locales --format='{{if .Enabled}}{{.LocaleID}}{{end}}\n'
+  files list
+  files list '**.json' --short
+  files push /smartling/en/strings.json --type json
+  files push /smartling/en/strings.json strings/en.json
+  files push '**.md' --type plaintext -b feature-branch
+  files push '**.md' --branch '@auto'
+  files pull '**.json' -l es-ES -l fr-FR
+  files pull --source
+  files delete '**.json'
+  files rename old/path.json new/path.json
+  files status
+  mt detect document.txt
+  mt detect '*.txt' --output json
+  mt translate document.txt -l es-ES
+  mt translate '*.txt' -l es -l fr --output-directory /smartling/translations/
+
+Full command reference:
+  https://github.com/Smartling/smartling-cli/wiki/Projects-command-examples
+  https://github.com/Smartling/smartling-cli/wiki/Files-command-examples
+  https://github.com/Smartling/smartling-cli/wiki/MT-command-examples`;
 
 export function createServer(execFileFn = execFileAsync) {
   const server = new McpServer({ name: 'smartling-mcp', version: '1.0.0' });
@@ -110,9 +131,9 @@ export function createServer(execFileFn = execFileAsync) {
   );
 
   server.registerTool(
-    'smartling-cli-ls',
+    'smartling-ls',
     {
-      description: 'List files in a directory. Only works within /smartling. Defaults to /smartling if no path given.',
+      description: 'List files in a smartling working directory. Only works within /smartling. Defaults to /smartling if no path given.',
       inputSchema: { path: z.string().optional().describe('Directory path to list, must start with /smartling, e.g. /smartling/src') }
     },
     async ({ path } = {}) => {
