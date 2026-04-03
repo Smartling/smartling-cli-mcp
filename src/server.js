@@ -111,13 +111,18 @@ export function createServer(execFileFn = execFileAsync) {
 
   server.registerTool(
     'smartling-cli-ls',
-    { description: 'List files in the current working directory.' },
-    async () => {
+    {
+      description: 'List files in a directory. Defaults to current working directory if no path given.',
+      inputSchema: { path: z.string().optional().describe('Directory path to list, e.g. /my/project/src') }
+    },
+    async ({ path } = {}) => {
+      const args = path ? ['-lah', path] : ['-lah'];
       try {
-        const { stdout } = await execFileFn('ls', ['-lah'], { env: process.env });
+        const { stdout } = await execFileFn('ls', args, { env: process.env });
         return { content: [{ type: 'text', text: stdout || '(empty directory)' }] };
       } catch (error) {
-        return { content: [{ type: 'text', text: `Failed to list files: ${error.message}` }] };
+        const output = [error.stdout, error.stderr].filter(Boolean).join('\n');
+        return { content: [{ type: 'text', text: output || `Failed to list files: ${error.message}` }] };
       }
     }
   );
