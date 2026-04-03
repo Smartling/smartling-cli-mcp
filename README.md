@@ -1,6 +1,6 @@
 # Smartling MCP Docker
 
-A Docker-based MCP (Model Context Protocol) server that wraps the [`smartling-cli`](https://github.com/Smartling/smartling-cli) tool, enabling Claude and other MCP clients to interact with Smartling TMS directly.
+A Docker-based MCP (Model Context Protocol) server that wraps [`smartling-cli`](https://github.com/Smartling/smartling-cli) — the official Smartling command-line tool. This MCP server is a thin wrapper and can only do what `smartling-cli` supports. Refer to the [smartling-cli documentation](https://github.com/Smartling/smartling-cli/wiki) for the full list of capabilities and limitations.
 
 ## Requirements
 
