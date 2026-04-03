@@ -109,5 +109,18 @@ export function createServer(execFileFn = execFileAsync) {
     handleToolCall
   );
 
+  server.registerTool(
+    'smartling-cli-ls',
+    { description: 'List files in the current working directory.' },
+    async () => {
+      try {
+        const { stdout } = await execFileFn('ls', ['-lah'], { env: process.env });
+        return { content: [{ type: 'text', text: stdout || '(empty directory)' }] };
+      } catch (error) {
+        return { content: [{ type: 'text', text: `Failed to list files: ${error.message}` }] };
+      }
+    }
+  );
+
   return { server, handleToolCall };
 }
