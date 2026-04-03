@@ -37,6 +37,8 @@ export function splitArgs(argsString) {
 
 const TOOL_DESCRIPTION = `Run any smartling-cli command. Pass arguments as a single string exactly as you would on the command line.
 
+Run --help on any command or subcommand to see all available options, e.g. "files push --help" or "mt translate --help".
+
 GLOBAL FLAGS (supported by all commands)
   -a, --account <account-id>             Override account ID
   -p, --project <project-id>             Override project ID
