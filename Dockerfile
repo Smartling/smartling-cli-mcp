@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM --platform=linux/amd64 node:20-alpine
 
 RUN apk add --no-cache curl && \
     curl -fsSL https://smartling-connectors-releases.s3.amazonaws.com/cli/smartling.linux \
