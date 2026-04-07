@@ -155,5 +155,26 @@ export function createServer(execFileFn = execFileAsync) {
     }
   );
 
+  server.registerTool(
+    'smartling-cat',
+    {
+      description: 'Print the contents of a file inside /smartling to the conversation. Use this to read source files before uploading or to inspect downloaded translations.',
+      inputSchema: { path: z.string().describe('File path to read, must be within /smartling, e.g. /smartling/en/strings.json') }
+    },
+    async ({ path }) => {
+      const resolved = resolve(path);
+      if (resolved !== '/smartling' && !resolved.startsWith('/smartling/')) {
+        return { content: [{ type: 'text', text: 'Error: path must be within /smartling' }] };
+      }
+      try {
+        const { stdout } = await execFileFn('cat', [resolved], { env: process.env });
+        return { content: [{ type: 'text', text: stdout }] };
+      } catch (error) {
+        const output = [error.stdout, error.stderr].filter(Boolean).join('\n');
+        return { content: [{ type: 'text', text: output || `Failed to read file: ${error.message}` }] };
+      }
+    }
+  );
+
   return { server, handleToolCall };
 }
