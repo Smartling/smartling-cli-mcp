@@ -1,76 +1,59 @@
-# CLAUDE.md
+# Smartling MCP — Claude Code Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What this MCP does
 
-## What This Is
+Wraps the `smartling-cli` binary. Two tools are available:
 
-Dockerized MCP server for listing local files and uploading them to Smartling. Built with NestJS + `@rekog/mcp-nest`, following the same architecture as [Smartling/smartling-mcp-server](https://github.com/Smartling/smartling-mcp-server).
+- **`smartling-cli`** — run any smartling-cli command as a string
+- **`smartling-ls`** — list files under `/smartling` (the mounted project directory)
 
-Two tools: `smartling_list_files` (browse mounted input directory) and `smartling_upload_file` (upload to Smartling project).
+## File access
 
-## Commands
+User files are mounted at `/smartling` inside the container. Always use `/smartling/...` paths when referring to files:
 
-```bash
-npm run build          # Compile to dist/ (nest build)
-npm run start:dev      # Dev with watch mode
-npm run start:prod     # Run compiled output (node dist/main.js)
-npm test               # Run all tests (jest)
-npx jest --testPathPattern=<pattern>  # Run a single test file
-npm run lint           # ESLint with --fix
-npm run format         # Prettier on src/**/*.ts
+```
+# Correct
+files push /smartling/en/strings.json --type json
 
-# Docker
-docker compose up --build   # Build and run container
-docker compose build        # Build only
+# Wrong
+files push ./en/strings.json
 ```
 
-## Environment
+Use `smartling-ls` (optionally with a path) to discover what files are available before operating on them.
 
-Requires `.env` file (copy from `.env.example`). Key variables: `SMARTLING_USER_IDENTIFIER`, `SMARTLING_USER_SECRET`, `SMARTLING_PROJECT_ID`. Optional: `SMARTLING_API_BASE_URL`, `INPUT_DIR` (default `/workspace/input`), `PORT` (default `3000`).
+## Credentials
 
-## Architecture
+`SMARTLING_USER_ID`, `SMARTLING_SECRET`, and `SMARTLING_PROJECT_ID` are injected automatically via Docker env. Do not ask the user for credentials and do not include them in commands.
 
-NestJS app using CJS module system. Transports: STDIO + SSE + Streamable HTTP (endpoint: `/mcp`).
+## Common task patterns
 
-### Module Structure
+**List available files:**
+```
+smartling-ls                              # list /smartling
+smartling-ls path=/smartling/en          # list a subdirectory
+```
 
-- `AppModule` — wires `ConfigModule` (global), `McpModule.forRoot()`, and `SmartlingMcpModule`
-- `SmartlingMcpModule` — registers tools via `McpModule.forFeature([...tools])`, provides services
+**Upload a file:**
+```
+smartling-cli: "files push /smartling/en/strings.json --type json"
+```
 
-### Adding a New Tool
+**Download translations:**
+```
+smartling-cli: "files pull '**.json' -l es-ES fr-FR"
+```
 
-Each tool follows this pattern — all four pieces are required:
+**Check translation progress:**
+```
+smartling-cli: "files status"
+```
 
-1. **Schema** at `src/smartling-mcp/tools/{name}/schema/{name}.schema.ts` — exports `TOOL_NAME`, `TOOL_DESCRIPTION`, `TOOL_INPUT_SCHEMA` (Zod), `TOOL_OUTPUT_SCHEMA` (Zod), and `Params` type
-2. **Tool class** at `src/smartling-mcp/tools/{name}/{name}.tool.ts` — `@Injectable()` class extending `BaseSmartlingTool`, with method decorated by `@Tool()` referencing the schema exports
-3. **Service** (if calling Smartling API) at `src/smartling-mcp/services/{domain}/smartling-{domain}.service.ts` — extends `SmartlingBaseService`, uses `buildApiClient()` to get SDK clients
-4. **Register** in `SmartlingMcpModule` — add to both `McpModule.forFeature([...])` and `providers`
+**List projects (needs --account if SMARTLING_PROJECT_ID not set):**
+```
+smartling-cli: "projects list -a <account-id>"
+```
 
-### Key Base Classes
-
-- `BaseSmartlingTool` — provides `createTextResponse(data)` and `createTextResponseFromString(data)` for MCP response formatting
-- `SmartlingBaseService` — provides `buildApiClient<T>(constructor)` to instantiate any Smartling SDK API class, and `getErrorReason(error)` for error extraction
-- `SmartlingApiPrebuilder` — NestJS injectable that creates `SmartlingApiClientBuilder` with auth from `ConfigService`
-
-### Schemas
-
-Use **Zod 4** (required by `@rekog/mcp-nest` >= 1.9.x). Import as `import z from 'zod'`.
-
-### Path Security
-
-`LocalFilesService` and `path-validation.utils.ts` enforce that all file access stays within `INPUT_DIR`. Path traversal and symlinks outside root are rejected. In Docker, the input directory is mounted read-only.
-
-## TypeScript Config
-
-- `tsconfig.json` has `"types": ["node", "jest"]` — this is intentional to avoid spurious errors from `@types/express`
-- Target: ES2023, CommonJS output
-- `noImplicitAny: false`, `strictNullChecks: true`
-
-## Docker
-
-Multi-stage build: Node 20 Alpine. Runs as non-root `appuser`. `sample-files/` is mounted at `/workspace/input:ro` in docker-compose.
-
-## Reference
-
-- Official Smartling MCP server (pattern source): `github.com/Smartling/smartling-mcp-server`
-- Smartling Node SDK: `smartling-api-sdk-nodejs` package
+**Machine translate:**
+```
+smartling-cli: "mt translate /smartling/en/strings.json -l es-ES"
+```

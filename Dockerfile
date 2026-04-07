@@ -1,21 +1,17 @@
-FROM node:20-alpine AS builder
+FROM --platform=linux/amd64 node:22-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://smartling-connectors-releases.s3.amazonaws.com/cli/smartling.linux \
+      -o /usr/local/bin/smartling-cli && \
+    chmod +x /usr/local/bin/smartling-cli
 
 WORKDIR /app
+
+RUN touch smartling.yml
+
 COPY package.json package-lock.json ./
-RUN npm ci
-COPY tsconfig.json tsconfig.build.json nest-cli.json ./
-COPY src/ ./src/
-RUN npm run build
+RUN npm install --omit=dev
 
-FROM node:20-alpine
+COPY src/ src/
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-COPY --from=builder /app/dist/ ./dist/
-RUN mkdir -p /workspace/input /workspace/output && chown appuser:appgroup /workspace/input /workspace/output
-
-USER appuser
-EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["node", "src/index.js"]

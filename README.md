@@ -1,200 +1,167 @@
-# Smartling Docker MCP Server
+# Smartling MCP Docker
 
-Dockerized MCP server for listing local files and uploading them to Smartling. Built with NestJS following the same architecture as [Smartling/smartling-mcp-server](https://github.com/Smartling/smartling-mcp-server).
+A Docker-based MCP (Model Context Protocol) server that wraps [`smartling-cli`](https://github.com/Smartling/smartling-cli) — the official Smartling command-line tool. This MCP server is a thin wrapper and can only do what `smartling-cli` supports. Refer to the [smartling-cli documentation](https://github.com/Smartling/smartling-cli/wiki) for the full list of capabilities and limitations.
+
+## Requirements
+
+- Docker
+- Smartling account credentials
 
 ## Tools
 
 | Tool | Description |
 |---|---|
-| `smartling_list_files` | List files in the mounted input directory, with optional subdirectory and glob filter |
-| `smartling_upload_file` | Upload a file from the input directory to a Smartling project |
-
-## Prerequisites
-
-- Node.js >= 20
-- Docker (for containerized usage)
-- Smartling API credentials (User Identifier + User Secret)
-- Smartling Project ID
+| `smartling-cli` | Run any `smartling-cli` command (projects, files, mt) |
+| `smartling-ls` | List files in `/smartling` or a subdirectory |
 
 ## Setup
 
-```bash
-# Install dependencies
-npm install
-
-# Copy and fill in environment variables
-cp .env.example .env
-# Edit .env with your Smartling credentials
-```
-
-## Required Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `SMARTLING_USER_IDENTIFIER` | Yes | — | Smartling API user identifier |
-| `SMARTLING_USER_SECRET` | Yes | — | Smartling API user secret |
-| `SMARTLING_PROJECT_ID` | Yes | — | Target Smartling project ID |
-| `SMARTLING_API_BASE_URL` | No | `https://api.smartling.com` | Smartling API base URL |
-| `INPUT_DIR` | No | `/workspace/input` | Path to allowed input directory |
-| `PORT` | No | `3000` | HTTP server port |
-
-## Run Locally
+### 1. Pull the image
 
 ```bash
-# Build
-npm run build
-
-# Start (uses STDIO + HTTP transports)
-npm run start:prod
-
-# Development with watch
-npm run start:dev
+docker pull smartlinginc/smartling-docker-mcp
 ```
 
-## Run in Docker
+### 2. Configure Claude Desktop
 
-```bash
-# Build and start
-docker compose up --build
-
-# Or build separately
-docker compose build
-docker compose up
-```
-
-The `sample-files/` directory is mounted read-only at `/workspace/input` inside the container.
-
-## Sample Folder Mount
-
-The MCP server operates on files from a configured input directory. In Docker, this is a volume mount:
-
-```yaml
-volumes:
-  - ./sample-files:/workspace/input:ro  # read-only mount
-```
-
-You can mount any local directory by changing the source path:
-
-```yaml
-volumes:
-  - /path/to/your/files:/workspace/input:ro
-```
-
-## MCP Client Configuration
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
-    "smartling-docker-mcp": {
+    "smartling": {
       "command": "docker",
-      "args": ["compose", "-f", "/path/to/smartling-docker-mcp/docker-compose.yml", "run", "--rm", "-T", "smartling-mcp"],
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "SMARTLING_USER_ID",
+        "-e", "SMARTLING_SECRET",
+        "-e", "SMARTLING_PROJECT_ID",
+        "-v", "/absolute/path/to/your/project:/smartling",
+        "smartlinginc/smartling-docker-mcp"
+      ],
       "env": {
-        "SMARTLING_USER_IDENTIFIER": "your_identifier",
-        "SMARTLING_USER_SECRET": "your_secret",
-        "SMARTLING_PROJECT_ID": "your_project_id"
+        "SMARTLING_USER_ID": "your-user-id",
+        "SMARTLING_SECRET": "your-secret",
+        "SMARTLING_PROJECT_ID": "your-project-id"
       }
     }
   }
 }
 ```
 
-### Streamable HTTP
+> **Important:** The volume mount must map to `/smartling` inside the container. The `smartling-ls` tool only works within that path.
 
-The server also exposes a Streamable HTTP endpoint at `http://localhost:3000/mcp`.
-
-## Example Tool Calls
-
-### List files
+To use a custom `smartling.yml` (e.g. with file type mappings), mount it into `/app/smartling.yml` inside the container:
 
 ```json
-{
-  "name": "smartling_list_files",
-  "arguments": {}
-}
+"-v", "/absolute/path/to/your/project:/smartling",
+"-v", "/absolute/path/to/smartling.yml:/app/smartling.yml",
 ```
 
+Restart Claude Desktop after editing the config.
+
+### 3. Configure Claude Code
+
+Add to your project's `.claude/settings.json` or run `/mcp` in Claude Code:
+
 ```json
 {
-  "name": "smartling_list_files",
-  "arguments": {
-    "subpath": "translations",
-    "pattern": "*.json"
+  "mcpServers": {
+    "smartling": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "SMARTLING_USER_ID",
+        "-e", "SMARTLING_SECRET",
+        "-e", "SMARTLING_PROJECT_ID",
+        "-v", "/absolute/path/to/your/project:/smartling",
+        "smartlinginc/smartling-docker-mcp"
+      ],
+      "env": {
+        "SMARTLING_USER_ID": "your-user-id",
+        "SMARTLING_SECRET": "your-secret",
+        "SMARTLING_PROJECT_ID": "your-project-id"
+      }
+    }
   }
 }
 ```
 
-### Upload file to Smartling
+With a custom `smartling.yml`:
 
 ```json
 {
-  "name": "smartling_upload_file",
-  "arguments": {
-    "file_path": "hello.json",
-    "file_type": "json"
+  "mcpServers": {
+    "smartling": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "SMARTLING_USER_ID",
+        "-e", "SMARTLING_SECRET",
+        "-e", "SMARTLING_PROJECT_ID",
+        "-v", "/absolute/path/to/your/project:/smartling",
+        "-v", "/absolute/path/to/smartling.yml:/app/smartling.yml",
+        "smartlinginc/smartling-docker-mcp"
+      ],
+      "env": {
+        "SMARTLING_USER_ID": "your-user-id",
+        "SMARTLING_SECRET": "your-secret",
+        "SMARTLING_PROJECT_ID": "your-project-id"
+      }
+    }
   }
 }
 ```
 
-```json
-{
-  "name": "smartling_upload_file",
-  "arguments": {
-    "file_path": "greeting.xliff",
-    "file_type": "xliff",
-    "file_uri": "mobile/greeting.xliff"
-  }
-}
-```
+## Usage examples
 
-## Architecture
+Once configured, ask Claude naturally:
 
-Follows the same NestJS + `@rekog/mcp-nest` pattern as the official Smartling MCP server:
+- *"List my Smartling projects"*
+- *"Show files available for translation"*
+- *"Push /smartling/en/strings.json to Smartling"*
+- *"Pull Spanish translations for all JSON files"*
+- *"Check translation status for my project"*
+- *"Machine translate /smartling/en/strings.json to French"*
 
-- **Tools** use `@Tool()` decorator from `@rekog/mcp-nest` and extend `BaseSmartlingTool`
-- **Services** extend `SmartlingBaseService` which uses `SmartlingApiPrebuilder` to construct SDK clients
-- **Schemas** use Zod and are in separate schema files per tool
-- **Path validation** prevents traversal outside the mounted input directory
+## Available `smartling-cli` commands
 
 ```
-src/
-├── main.ts                          # NestJS bootstrap
-├── app.module.ts                    # Root module (Config, MCP, SmartlingMcp)
-├── config/index.ts                  # Environment configuration
-├── commons/
-│   └── smartling-api-prebuilder.ts  # SDK client factory
-└── smartling-mcp/
-    ├── smartling-mcp.module.ts      # MCP feature module
-    ├── dto/                         # Response DTOs
-    ├── enum/                        # Content type enum
-    ├── services/
-    │   ├── smartling-base.service.ts
-    │   ├── files/                   # Smartling upload service
-    │   └── local-files/             # Local filesystem service
-    ├── tools/
-    │   ├── base-smartling-tool.ts
-    │   ├── list-files/              # list_files tool + schema
-    │   └── upload-file/             # upload_file tool + schema
-    └── utils/
-        └── path-validation.utils.ts
+PROJECTS
+  projects list                          List all projects in the account
+  projects info                          Show details about the current project
+  projects locales                       List target locales
+    -s, --short                          Locale IDs only
+    --source                             Source locale only
+    --format '<go-template>'             Custom output format
+
+FILES
+  files list ['<mask>']                  List files in project
+    --short                              URIs only
+  files push <file> [<uri>]              Upload a file
+    --type <type>                        Override file type (e.g. json, plaintext)
+    -b, --branch <prefix>                Add branch prefix; @auto detects git branch
+    --directive <directive>              Set file-level directive
+  files pull ['<mask>']                  Download translated files
+    --source                             Download source only
+    -l <locale>                          Target locale (repeatable)
+  files delete ['<mask>']               Delete files
+  files rename <old-uri> <new-uri>       Rename a file URI
+  files status                           Show translation progress
+
+MT (Machine Translation)
+  mt detect '<mask>'                     Detect source language
+    -s, --short                          Output locale code only
+    --output table|json                  Output format
+  mt translate '<mask>'                  Machine translate files
+    -l, --target-locale <locale>         Target locale (repeatable)
+    --source-locale <locale>             Source language (auto-detected if omitted)
+    --input-directory <dir>              Source directory
+    --output-directory <dir>             Output directory
+
+GLOBAL FLAGS
+  -a, --account <account-id>             Override account ID
+  -p, --project <project-id>             Override project ID
 ```
 
-## Security
-
-- Only files inside the configured `INPUT_DIR` can be accessed
-- Path traversal (`../`) is blocked
-- Symlinks pointing outside the root directory are rejected
-- Input directory is mounted read-only in Docker
-- Container runs as non-root user
-- Secrets are passed via environment variables only
-
-## Assumptions
-
-1. Uses Smartling v2 OAuth — SDK handles token lifecycle automatically
-2. No job/batch association on upload — files appear in project's Files list
-3. No locale specification on upload — source file only
-4. `file_uri` defaults to relative path; overwrites if same URI exists
-5. No Smartling directives exposed — can be added later
+Full documentation: [smartling-cli wiki](https://github.com/Smartling/smartling-cli/wiki)
